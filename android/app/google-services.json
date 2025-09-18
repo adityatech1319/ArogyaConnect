@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "646876608066",
+    "project_id": "arogya-connect-sih-2025",
+    "storage_bucket": "arogya-connect-sih-2025.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:646876608066:android:183b02c2af0c9119b69fdb",
+        "android_client_info": {
+          "package_name": "com.arogyaconnectsih"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBz5uWM5TQ0gcLPvT2E-xJs_64UXoqa5VU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
