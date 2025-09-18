@@ -20,34 +20,64 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 3, // bump version (since schema change: id -> TEXT)
       onCreate: _createDB,
+      onUpgrade: _upgradeDB,
     );
   }
 
   Future _createDB(Database db, int version) async {
     await db.execute('''
       CREATE TABLE patients (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id TEXT PRIMARY KEY, -- Firestore ID or UUID
         name TEXT NOT NULL,
         age INTEGER NOT NULL,
         gender TEXT NOT NULL,
-        village TEXT NOT NULL
+        phone TEXT NOT NULL,
+        address TEXT NOT NULL,
+        weight REAL NOT NULL,
+        height REAL NOT NULL,
+        lastAppointmentDate TEXT
       )
     ''');
   }
 
+  Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 3) {
+      // Drop old table (with int id) and recreate with text id
+      await db.execute("DROP TABLE IF EXISTS patients");
+      await _createDB(db, newVersion);
+    }
+  }
+
+  /// Insert a new patient
   Future<int> insertPatient(Patient patient) async {
     final db = await instance.database;
-    return await db.insert('patients', patient.toMap());
+    return await db.insert(
+      'patients',
+      patient.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace, // ✅ if same id, replace
+    );
   }
 
+  /// Insert or update patient (used for Firestore sync)
+  Future<void> insertOrUpdatePatient(Patient patient) async {
+    final db = await instance.database;
+    await db.insert(
+      'patients',
+      patient.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  /// Get all patients
   Future<List<Patient>> getPatients() async {
     final db = await instance.database;
-    final result = await db.query('patients');
-    return result.map((map) => Patient.fromMap(map)).toList();
+    final result = await db.query('patients', orderBy: "name ASC");
+    return result.map((map) => Patient.fromMap(map, map['id'] as String)).toList();
   }
 
+  /// Update patient
   Future<int> updatePatient(Patient patient) async {
     final db = await instance.database;
     return await db.update(
@@ -58,7 +88,8 @@ class DatabaseHelper {
     );
   }
 
-  Future<int> deletePatient(int id) async {
+  /// Delete patient
+  Future<int> deletePatient(String id) async {
     final db = await instance.database;
     return await db.delete(
       'patients',

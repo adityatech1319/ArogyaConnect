@@ -1,12 +1,19 @@
+// lib/main.dart
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'providers/patient_provider.dart';
-import 'models/patient.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
-// Import screens
-import 'screens/patient_form_screen.dart';
+import 'screens/dashboards/admin_dashboard.dart';
+import 'screens/dashboards/doctor_dashboard.dart';
+import 'screens/dashboards/asha_dashboard.dart';
+import 'screens/dashboards/patient_dashboard.dart';
+import 'firebase_options.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(const ArogyaConnectApp());
 }
 
@@ -15,152 +22,124 @@ class ArogyaConnectApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => PatientProvider(),
-      child: MaterialApp(
-        debugShowCheckedModeBanner: false,
-        title: "ArogyaConnect",
-        theme: ThemeData(primarySwatch: Colors.green),
-        home: LoginScreen(),
+    return MaterialApp(
+      title: "Arogya Connect",
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        primarySwatch: Colors.teal,
+        useMaterial3: true,
       ),
+      home: const AuthWrapper(),
     );
   }
 }
 
-//////////////////////////
-// LOGIN SCREEN
-//////////////////////////
-class LoginScreen extends StatefulWidget {
+/// 🔹 Decides whether to show login or dashboard
+class AuthWrapper extends StatelessWidget {
+  const AuthWrapper({super.key});
+
   @override
-  _LoginScreenState createState() => _LoginScreenState();
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        final user = snapshot.data;
+        if (user == null) {
+          return const LoginScreen();
+        }
+
+        // ✅ Simplified role mapping by email
+        switch (user.email) {
+          case "admin@demo.com":
+            return const AdminDashboard();
+          case "doctor@demo.com":
+            return DoctorDashboard(userId: user.uid);
+          case "asha@demo.com":
+            return AshaDashboard(userId: user.uid);
+          case "patient@demo.com":
+            return PatientDashboard(userId: user.uid);
+          default:
+            return const Scaffold(
+              body: Center(child: Text("Role not found")),
+            );
+        }
+      },
+    );
+  }
+}
+
+/// 🔹 Simple Login Screen
+class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _formKey = GlobalKey<FormState>();
-  String username = '';
-  String password = '';
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _loading = false;
+  String? _error;
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text("ArogyaConnect Login")),
-      body: Padding(
-        padding: EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              TextFormField(
-                decoration: InputDecoration(labelText: "Username"),
-                onSaved: (val) => username = val!,
-                validator: (val) =>
-                    val!.isEmpty ? "Enter username" : null,
-              ),
-              TextFormField(
-                decoration: InputDecoration(labelText: "Password"),
-                obscureText: true,
-                onSaved: (val) => password = val!,
-                validator: (val) =>
-                    val!.isEmpty ? "Enter password" : null,
-              ),
-              SizedBox(height: 20),
-              ElevatedButton(
-                child: Text("Login"),
-                onPressed: () {
-                  if (_formKey.currentState!.validate()) {
-                    _formKey.currentState!.save();
+  void _login() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
 
-                    // Simple hardcoded login
-                    if (username == "admin" && password == "1234") {
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => PatientListScreen()),
-                      );
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text("Invalid credentials")),
-                      );
-                    }
-                  }
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    try {
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
+    } on FirebaseAuthException catch (e) {
+      setState(() => _error = e.message);
+    } finally {
+      setState(() => _loading = false);
+    }
   }
-}
 
-//////////////////////////
-// PATIENT LIST SCREEN
-//////////////////////////
-class PatientListScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final provider = Provider.of<PatientProvider>(context);
-
     return Scaffold(
-      appBar: AppBar(
-        title: Text("Patient Records"),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.logout),
-            onPressed: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (_) => LoginScreen()),
-              );
-            },
-          )
-        ],
-      ),
-      body: provider.patients.isEmpty
-          ? Center(child: Text("No patients yet"))
-          : ListView.builder(
-              itemCount: provider.patients.length,
-              itemBuilder: (context, index) {
-                final patient = provider.patients[index];
-                return ListTile(
-                  title: Text(patient.name),
-                  subtitle: Text(
-                      "Age: ${patient.age}, Gender: ${patient.gender}, Village: ${patient.village}"),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: Icon(Icons.edit, color: Colors.blue),
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  PatientFormScreen(editPatient: patient),
-                            ),
-                          );
-                        },
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.delete, color: Colors.red),
-                        onPressed: () {
-                          provider.deletePatient(patient.id!);
-                        },
-                      ),
-                    ],
-                  ),
-                );
-              },
+      appBar: AppBar(title: const Text("Login")),
+      body: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            TextField(
+              controller: _emailController,
+              decoration: const InputDecoration(labelText: "Email"),
             ),
-      floatingActionButton: FloatingActionButton(
-        child: Icon(Icons.add),
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => PatientFormScreen()),
-          );
-        },
+            const SizedBox(height: 12),
+            TextField(
+              controller: _passwordController,
+              decoration: const InputDecoration(labelText: "Password"),
+              obscureText: true,
+            ),
+            const SizedBox(height: 20),
+            if (_error != null)
+              Text(
+                _error!,
+                style: const TextStyle(color: Colors.red),
+              ),
+            const SizedBox(height: 20),
+            _loading
+                ? const CircularProgressIndicator()
+                : ElevatedButton(
+                    onPressed: _login,
+                    child: const Text("Login"),
+                  ),
+          ],
+        ),
       ),
     );
   }

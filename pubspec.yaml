@@ -1,6 +1,6 @@
 name: arogyaconnect
 description: "A new Flutter project."
-publish_to: 'none' 
+publish_to: 'none'
 version: 1.0.0+1
 
 environment:
@@ -10,21 +10,47 @@ dependencies:
   flutter:
     sdk: flutter
 
-  cupertino_icons: ^1.0.2
-  provider: ^6.0.5
+  # Local database
   sqflite: ^2.3.0
   path: ^1.8.3
+  http: ^1.2.0
+  google_generative_ai: ^0.4.3
+  
+
+  # Firebase Core (required for all Firebase services)
+  firebase_core: ^2.15.0
+
+  # Firebase Authentication (for Admin/Doctor/ASHA login)
+  firebase_auth: ^4.7.0
+
+  # Cloud Firestore (for storing users, patients, doctors, etc.)
+  cloud_firestore: ^4.10.0
+
+  # Firebase Storage (if you want to upload files like reports, images)
+  firebase_storage: ^11.2.0
+
+  # State management
+  provider: ^6.0.5
+
+  # UI / Icons
+  google_fonts: ^5.1.0
+  font_awesome_flutter: ^10.5.0
+
+  # Forms & validation
+  flutter_form_builder: ^9.1.0
+
+  # Date formatting
+  intl: ^0.18.1
+  flutter_dotenv: ^6.0.0
 
 dev_dependencies:
   flutter_launcher_icons: ^0.13.1
 
-# 👇 flutter section for assets & design
 flutter:
   uses-material-design: true
   assets:
     - assets/images/logo.png
 
-# 👇 config for launcher icons
 flutter_icons:
   android: true
   ios: true
