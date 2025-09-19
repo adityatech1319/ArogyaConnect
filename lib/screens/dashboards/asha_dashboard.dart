@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // ✅ Add this for logout
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:arogyaconnect/services/database_service.dart';
 import 'package:arogyaconnect/models/patient.dart';
 import 'package:arogyaconnect/widgets/patient_card.dart';
 import 'package:arogyaconnect/screens/symptom_checker_screen.dart';
+import 'package:arogyaconnect/main.dart'; // ✅ For LoginScreen
+import 'package:arogyaconnect/screens/login_screen.dart';
+
 
 class AshaDashboard extends StatefulWidget {
   final String userId;
@@ -22,6 +25,8 @@ class _AshaDashboardState extends State<AshaDashboard> {
   String _status = "unavailable";
   String _dutyStart = "";
   String _dutyEnd = "";
+  int _doctorAvailable = 0;
+  int _doctorUnavailable = 0;
 
   @override
   void initState() {
@@ -33,6 +38,7 @@ class _AshaDashboardState extends State<AshaDashboard> {
     try {
       final patientsData = await _dbService.getAshaPatients(widget.userId);
       final user = await _dbService.getUserById(widget.userId);
+      final doctorCounts = await _dbService.getDoctorAvailabilityCounts();
 
       setState(() {
         _patients = patientsData
@@ -42,6 +48,9 @@ class _AshaDashboardState extends State<AshaDashboard> {
         _status = user?['status'] ?? "unavailable";
         _dutyStart = user?['dutyStart'] ?? "";
         _dutyEnd = user?['dutyEnd'] ?? "";
+        _doctorAvailable = doctorCounts['available'] ?? 0;
+        _doctorUnavailable = doctorCounts['unavailable'] ?? 0;
+
         _loading = false;
       });
     } catch (e) {
@@ -216,7 +225,14 @@ class _AshaDashboardState extends State<AshaDashboard> {
             icon: const Icon(Icons.logout),
             tooltip: "Logout",
             onPressed: () async {
-              await FirebaseAuth.instance.signOut(); // ✅ logout
+              await FirebaseAuth.instance.signOut();
+              if (mounted) {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  (route) => false,
+                );
+              }
             },
           ),
           PopupMenuButton<String>(
@@ -242,6 +258,18 @@ class _AshaDashboardState extends State<AshaDashboard> {
               child: ListView(
                 padding: const EdgeInsets.all(12),
                 children: [
+                  // ✅ Doctor availability card
+                  Card(
+                    child: ListTile(
+                      leading: const Icon(Icons.medical_services,
+                          color: Colors.blue),
+                      title: const Text("Doctors Availability"),
+                      subtitle: Text(
+                          "Available: $_doctorAvailable | Unavailable: $_doctorUnavailable"),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  // ✅ ASHA status card
                   Card(
                     color: _status == "available"
                         ? Colors.green[100]

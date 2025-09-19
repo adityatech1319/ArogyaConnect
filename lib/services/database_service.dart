@@ -7,10 +7,11 @@ class DatabaseService {
   // ---------------- Patients ----------------
 
   /// Add a new patient to the database
-  Future<void> addPatient(Patient patient, String createdBy) async {
+  Future<void> addPatient(Patient patient, String ashaId) async {
     await _db.collection('patients').add({
       ...patient.toMap(),
-      'createdBy': createdBy,
+      'ashaId': ashaId, // ✅ Link patient to ASHA
+      'createdBy': ashaId,
       'createdAt': FieldValue.serverTimestamp(),
     });
   }
@@ -28,25 +29,20 @@ class DatabaseService {
   /// Get all patients in real-time as a stream
   Stream<List<Patient>> getPatients() {
     return _db.collection('patients').snapshots().map(
-      (snapshot) {
-        return snapshot.docs
-            .map((doc) => Patient.fromMap(doc.data(), doc.id))
-            .toList();
-      },
-    );
+          (snapshot) => snapshot.docs
+              .map((doc) => Patient.fromMap(doc.data(), doc.id))
+              .toList(),
+        );
   }
 
   /// Get patients assigned to a specific ASHA worker
   Future<List<Map<String, dynamic>>> getAshaPatients(String ashaId) async {
-    final snapshot = await _db
-        .collection('patients')
-        .where('ashaId', isEqualTo: ashaId)
-        .get();
+    final snapshot =
+        await _db.collection('patients').where('ashaId', isEqualTo: ashaId).get();
 
-    return snapshot.docs.map((doc) => {
-      'id': doc.id,
-      ...doc.data()
-    }).toList();
+    return snapshot.docs
+        .map((doc) => {'id': doc.id, ...doc.data()})
+        .toList();
   }
 
   /// Find a patient by phone number
@@ -58,9 +54,18 @@ class DatabaseService {
         .get();
 
     if (snapshot.docs.isNotEmpty) {
-      return Patient.fromMap(snapshot.docs.first.data(), snapshot.docs.first.id);
+      return Patient.fromMap(
+        snapshot.docs.first.data(),
+        snapshot.docs.first.id,
+      );
     }
     return null;
+  }
+
+  /// ✅ Get patient by Firestore document ID (needed for dashboard)
+  Future<Map<String, dynamic>?> getPatientById(String patientId) async {
+    final doc = await _db.collection('patients').doc(patientId).get();
+    return doc.exists ? {'id': doc.id, ...doc.data()!} : null;
   }
 
   // ---------------- Users (Admin, Doctor, ASHA) ----------------
@@ -77,7 +82,7 @@ class DatabaseService {
   Future<void> createUser(String username, String password, String role) async {
     await _db.collection('users').add({
       'username': username,
-      'password': password, // ⚠️ In production, never store raw passwords!
+      'password': password, // ⚠️ In production, hash this!
       'role': role,
       'status': role == 'doctor' || role == 'asha' ? 'unavailable' : null,
       'createdAt': FieldValue.serverTimestamp(),
@@ -93,18 +98,15 @@ class DatabaseService {
         .get();
 
     if (snapshot.docs.isNotEmpty) {
-      return {
-        'id': snapshot.docs.first.id,
-        ...snapshot.docs.first.data(),
-      };
+      return {'id': snapshot.docs.first.id, ...snapshot.docs.first.data()};
     }
     return null;
   }
 
-  /// Get user by their document ID
+  /// ✅ Get user by Firestore document ID
   Future<Map<String, dynamic>?> getUserById(String userId) async {
     final doc = await _db.collection('users').doc(userId).get();
-    return doc.exists ? {...doc.data()!, 'id': doc.id} : null;
+    return doc.exists ? {'id': doc.id, ...doc.data()!} : null;
   }
 
   /// Get all doctors as a stream
@@ -128,7 +130,8 @@ class DatabaseService {
   }
 
   /// Update doctor status and duty timings together
-  Future<void> updateDoctorStatusAndDuty(String userId, String status, String dutyStart, String dutyEnd) async {
+  Future<void> updateDoctorStatusAndDuty(
+      String userId, String status, String dutyStart, String dutyEnd) async {
     await _db.collection('users').doc(userId).update({
       'status': status,
       'dutyStart': dutyStart,
@@ -175,14 +178,36 @@ class DatabaseService {
 
   /// Get statistics for admin dashboard
   Future<Map<String, int>> getAdminStats() async {
-    final doctors = await _db.collection('users').where('role', isEqualTo: 'doctor').get();
-    final ashas = await _db.collection('users').where('role', isEqualTo: 'asha').get();
+    final doctors =
+        await _db.collection('users').where('role', isEqualTo: 'doctor').get();
+    final ashas =
+        await _db.collection('users').where('role', isEqualTo: 'asha').get();
     final patients = await _db.collection('patients').get();
 
     return {
       'doctorCount': doctors.size,
       'ashaCount': ashas.size,
       'patientCount': patients.size,
+    };
+  }
+
+  /// ✅ Get doctor availability counts
+  Future<Map<String, int>> getDoctorAvailabilityCounts() async {
+    final available = await _db
+        .collection('users')
+        .where('role', isEqualTo: 'doctor')
+        .where('status', isEqualTo: 'available')
+        .get();
+
+    final unavailable = await _db
+        .collection('users')
+        .where('role', isEqualTo: 'doctor')
+        .where('status', isEqualTo: 'unavailable')
+        .get();
+
+    return {
+      'available': available.size,
+      'unavailable': unavailable.size,
     };
   }
 

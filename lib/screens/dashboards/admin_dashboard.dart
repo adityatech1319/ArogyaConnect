@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:arogyaconnect/services/database_service.dart';
+import 'package:arogyaconnect/screens/login_screen.dart'; // ✅ make sure you have this
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -95,7 +97,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 Navigator.pop(context);
                 _loadCounts();
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text("${role.toUpperCase()} created successfully")),
+                  SnackBar(
+                      content:
+                          Text("${role.toUpperCase()} created successfully")),
                 );
               }
             },
@@ -106,11 +110,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  Widget _buildStatCard(String title, int count, IconData icon, Color color) {
+  Widget _buildStatCard(
+      String title, int count, IconData icon, Color color, VoidCallback onTap) {
     return Card(
       elevation: 3,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
+        onTap: onTap,
         leading: CircleAvatar(
           backgroundColor: color,
           child: Icon(icon, color: Colors.white),
@@ -124,6 +130,27 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
+  /// 🔹 Show list of users (doctor/asha)
+  void _showUserList(String role) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => UserListScreen(role: role),
+      ),
+    );
+  }
+
+  /// 🔹 Logout with redirection
+  Future<void> _logout() async {
+    await FirebaseAuth.instance.signOut();
+    if (!mounted) return;
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (route) => false, // remove all routes
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -134,9 +161,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: "Logout",
-            onPressed: () async {
-              await FirebaseAuth.instance.signOut();
-            },
+            onPressed: _logout,
           ),
         ],
       ),
@@ -147,15 +172,20 @@ class _AdminDashboardState extends State<AdminDashboard> {
               child: ListView(
                 padding: const EdgeInsets.all(20),
                 children: [
-                  Text("Overview", style: Theme.of(context).textTheme.titleLarge),
+                  Text("Overview",
+                      style: Theme.of(context).textTheme.titleLarge),
                   const SizedBox(height: 10),
 
-                  _buildStatCard("Doctors", doctorCount, Icons.medical_services, Colors.blue),
-                  _buildStatCard("ASHA Workers", ashaCount, Icons.people, Colors.orange),
-                  _buildStatCard("Patients", patientCount, Icons.person, Colors.red),
+                  _buildStatCard("Doctors", doctorCount, Icons.medical_services,
+                      Colors.blue, () => _showUserList("doctor")),
+                  _buildStatCard("ASHA Workers", ashaCount, Icons.people,
+                      Colors.orange, () => _showUserList("asha")),
+                  _buildStatCard("Patients", patientCount, Icons.person,
+                      Colors.red, () {}), // Patients list later
 
                   const SizedBox(height: 20),
-                  Text("Manage Users", style: Theme.of(context).textTheme.titleLarge),
+                  Text("Manage Users",
+                      style: Theme.of(context).textTheme.titleLarge),
                   const SizedBox(height: 10),
 
                   ElevatedButton.icon(
@@ -172,6 +202,50 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 ],
               ),
             ),
+    );
+  }
+}
+
+/// 🔹 User List Screen for Doctors / ASHA
+class UserListScreen extends StatelessWidget {
+  final String role;
+  const UserListScreen({super.key, required this.role});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text("${role.toUpperCase()} List")),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection("users")
+            .where("role", isEqualTo: role)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final docs = snapshot.data!.docs;
+
+          if (docs.isEmpty) {
+            return Center(child: Text("No ${role.toUpperCase()} found."));
+          }
+
+          return ListView.builder(
+            itemCount: docs.length,
+            itemBuilder: (context, index) {
+              final data = docs[index].data() as Map<String, dynamic>;
+              return Card(
+                child: ListTile(
+                  leading: const Icon(Icons.person),
+                  title: Text(data['username'] ?? "Unknown"),
+                  subtitle:
+                      Text("Password: ${data['password'] ?? 'Not Available'}"),
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }
