@@ -1,8 +1,11 @@
 // lib/screens/dashboards/doctor_dashboard.dart
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // ✅ Add FirebaseAuth for sign out
 import 'package:arogyaconnect/services/database_service.dart';
 import 'package:arogyaconnect/models/patient.dart';
 import 'package:arogyaconnect/widgets/patient_card.dart';
+import 'package:arogyaconnect/main.dart'; // ✅ For LoginScreen
+import 'package:arogyaconnect/screens/login_screen.dart'; // ✅ For LoginScreen
 
 class DoctorDashboard extends StatefulWidget {
   final String userId;
@@ -69,12 +72,29 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
     });
   }
 
+  /// 🔹 Logout method
+  Future<void> _logout() async {
+    await FirebaseAuth.instance.signOut();
+    if (mounted) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text("Doctor Dashboard"),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: "Logout",
+            onPressed: _logout,
+          ),
           PopupMenuButton<String>(
             onSelected: (val) {
               if (val == "available" || val == "unavailable") {

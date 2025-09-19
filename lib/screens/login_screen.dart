@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../services/database_service.dart';
 
 // Dashboards
@@ -7,7 +6,6 @@ import 'dashboards/admin_dashboard.dart';
 import 'dashboards/doctor_dashboard.dart';
 import 'dashboards/asha_dashboard.dart';
 import 'dashboards/patient_dashboard.dart';
-
 
 // Models
 import '../models/patient.dart';
@@ -75,17 +73,16 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       }
 
-      // ✅ PATIENT LOGIN (via phone only)
+      // ✅ PATIENT LOGIN (via phone only, NO PASSWORD)
       else if (phone.isNotEmpty) {
         final Patient? patient = await _dbService.getPatientByPhone(phone);
         if (patient != null) {
           Navigator.pushReplacement(
-  context,
-  MaterialPageRoute(
-    builder: (_) => PatientDashboard(userId: patient.id),
-  ),
-);
-
+            context,
+            MaterialPageRoute(
+              builder: (_) => PatientDashboard(userId: patient.id),
+            ),
+          );
         } else {
           _showError("No patient found with this phone number.");
         }
@@ -126,7 +123,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 40),
 
-              // Username (for Admin/Doctor/ASHA)
+              // Username (Admin/Doctor/ASHA)
               TextField(
                 controller: _usernameController,
                 decoration: const InputDecoration(
