@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:arogyaconnect/services/database_service.dart';
 import 'package:arogyaconnect/models/patient.dart';
 import 'package:arogyaconnect/widgets/patient_card.dart';
 import 'package:arogyaconnect/screens/symptom_checker_screen.dart';
-import 'package:arogyaconnect/main.dart'; // ✅ For LoginScreen
 import 'package:arogyaconnect/screens/login_screen.dart';
-
 
 class AshaDashboard extends StatefulWidget {
   final String userId;
@@ -92,14 +91,59 @@ class _AshaDashboardState extends State<AshaDashboard> {
     });
   }
 
+  /// ✅ Assign Doctor Function (centralized in DatabaseService)
+  Future<void> _assignDoctor(String patientId) async {
+    final doctorsSnapshot = await FirebaseFirestore.instance
+        .collection("users")
+        .where("role", isEqualTo: "doctor")
+        .get();
+
+    if (doctorsSnapshot.docs.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("No doctors available")),
+      );
+      return;
+    }
+
+    final selectedDoctor = await showDialog<DocumentSnapshot>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text("Select Doctor"),
+        children: doctorsSnapshot.docs.map((doc) {
+          final doctor = doc.data() as Map<String, dynamic>;
+          return SimpleDialogOption(
+            child: Text(doctor['username'] ?? "Unknown"),
+            onPressed: () => Navigator.pop(context, doc),
+          );
+        }).toList(),
+      ),
+    );
+
+    if (selectedDoctor != null) {
+      final doctorData = selectedDoctor.data() as Map<String, dynamic>;
+      final doctorName = doctorData['username'] ?? "Unknown";
+
+      await _dbService.assignDoctorToPatient(
+        patientId,
+        selectedDoctor.id,
+        doctorName,
+      );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("✅ Doctor assigned successfully")),
+      );
+      _loadData();
+    }
+  }
+
   void _showPatientForm({Patient? patient}) {
+    final formKey = GlobalKey<FormState>();
     final nameCtrl = TextEditingController(text: patient?.name ?? "");
-    final ageCtrl =
-        TextEditingController(text: patient?.age?.toString() ?? "");
+    final ageCtrl = TextEditingController(text: patient?.age.toString() ?? "");
     final weightCtrl =
-        TextEditingController(text: patient?.weight?.toString() ?? "");
+        TextEditingController(text: patient?.weight.toString() ?? "");
     final heightCtrl =
-        TextEditingController(text: patient?.height?.toString() ?? "");
+        TextEditingController(text: patient?.height.toString() ?? "");
     final addressCtrl = TextEditingController(text: patient?.address ?? "");
     final phoneCtrl = TextEditingController(text: patient?.phone ?? "");
 
@@ -111,72 +155,84 @@ class _AshaDashboardState extends State<AshaDashboard> {
       builder: (_) => AlertDialog(
         title: Text(patient == null ? "Add Patient" : "Edit Patient"),
         content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameCtrl,
-                decoration: const InputDecoration(labelText: "Name"),
-              ),
-              TextField(
-                controller: ageCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: "Age"),
-              ),
-              DropdownButtonFormField<String>(
-                value: gender,
-                items: ["Male", "Female", "Other"]
-                    .map((g) => DropdownMenuItem(value: g, child: Text(g)))
-                    .toList(),
-                onChanged: (val) => gender = val ?? "Male",
-                decoration: const InputDecoration(labelText: "Gender"),
-              ),
-              TextField(
-                controller: weightCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: "Weight (kg)"),
-              ),
-              TextField(
-                controller: heightCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: "Height (cm)"),
-              ),
-              TextField(
-                controller: addressCtrl,
-                decoration: const InputDecoration(labelText: "Address"),
-              ),
-              TextField(
-                controller: phoneCtrl,
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(labelText: "Phone"),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      lastAppointment == null
-                          ? "Last Appointment: Not set"
-                          : "Last Appointment: ${lastAppointment?.toLocal().toString().split(' ')[0]}",
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(labelText: "Name"),
+                ),
+                TextFormField(
+                  controller: ageCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: "Age"),
+                ),
+                DropdownButtonFormField<String>(
+                  value: gender,
+                  items: ["Male", "Female", "Other"]
+                      .map((g) => DropdownMenuItem(value: g, child: Text(g)))
+                      .toList(),
+                  onChanged: (val) => gender = val ?? "Male",
+                  decoration: const InputDecoration(labelText: "Gender"),
+                ),
+                TextFormField(
+                  controller: weightCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: "Weight (kg)"),
+                ),
+                TextFormField(
+                  controller: heightCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: "Height (cm)"),
+                ),
+                TextFormField(
+                  controller: addressCtrl,
+                  decoration: const InputDecoration(labelText: "Address"),
+                ),
+                TextFormField(
+                  controller: phoneCtrl,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(labelText: "Phone"),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return "Phone number is required";
+                    }
+                    if (!RegExp(r'^[0-9]{10}$').hasMatch(value)) {
+                      return "Enter a valid 10-digit phone number";
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        lastAppointment == null
+                            ? "Last Appointment: Not set"
+                            : "Last Appointment: ${lastAppointment?.toLocal().toString().split(' ')[0]}",
+                      ),
                     ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.calendar_today),
-                    onPressed: () async {
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: lastAppointment ?? DateTime.now(),
-                        firstDate: DateTime(2000),
-                        lastDate: DateTime(2100),
-                      );
-                      if (picked != null) {
-                        setState(() => lastAppointment = picked);
-                      }
-                    },
-                  ),
-                ],
-              ),
-            ],
+                    IconButton(
+                      icon: const Icon(Icons.calendar_today),
+                      onPressed: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: lastAppointment ?? DateTime.now(),
+                          firstDate: DateTime(2000),
+                          lastDate: DateTime(2100),
+                        );
+                        if (picked != null) {
+                          setState(() => lastAppointment = picked);
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
         actions: [
@@ -185,6 +241,8 @@ class _AshaDashboardState extends State<AshaDashboard> {
               child: const Text("Cancel")),
           ElevatedButton(
             onPressed: () async {
+              if (!formKey.currentState!.validate()) return;
+
               final newPatient = Patient(
                 id: patient?.id ?? "",
                 name: nameCtrl.text.trim(),
@@ -258,7 +316,6 @@ class _AshaDashboardState extends State<AshaDashboard> {
               child: ListView(
                 padding: const EdgeInsets.all(12),
                 children: [
-                  // ✅ Doctor availability card
                   Card(
                     child: ListTile(
                       leading: const Icon(Icons.medical_services,
@@ -269,7 +326,6 @@ class _AshaDashboardState extends State<AshaDashboard> {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  // ✅ ASHA status card
                   Card(
                     color: _status == "available"
                         ? Colors.green[100]
@@ -314,6 +370,7 @@ class _AshaDashboardState extends State<AshaDashboard> {
                     (p) => PatientCard(
                       patient: p,
                       onEdit: () => _showPatientForm(patient: p),
+                      onAssignDoctor: () => _assignDoctor(p.id),
                     ),
                   ),
                 ],

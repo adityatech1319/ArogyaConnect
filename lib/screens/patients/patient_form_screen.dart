@@ -116,7 +116,7 @@ void initState() {
                 keyboardType: TextInputType.number,
               ),
               DropdownButtonFormField<String>(
-                value: _gender,
+                initialValue: _gender,
                 decoration: const InputDecoration(labelText: "Gender"),
                 items: ["Male", "Female", "Other"]
                     .map((g) => DropdownMenuItem(value: g, child: Text(g)))

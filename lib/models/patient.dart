@@ -11,6 +11,11 @@ class Patient {
   final String phone;
   final DateTime? lastAppointmentDate;
 
+  /// 🔹 New fields for linking doctor + ASHA
+  final String? doctorId;
+  final String? doctorName; // ✅ Added for storing assigned doctor name
+  final String? ashaId;
+
   Patient({
     required this.id,
     required this.name,
@@ -21,8 +26,12 @@ class Patient {
     required this.address,
     required this.phone,
     this.lastAppointmentDate,
+    this.doctorId,
+    this.doctorName, // ✅ Added
+    this.ashaId,
   });
 
+  /// 🔹 Convert Patient object to Firestore Map
   Map<String, dynamic> toMap() {
     return {
       'name': name,
@@ -32,13 +41,18 @@ class Patient {
       'gender': gender,
       'address': address,
       'phone': phone,
-      // ✅ Always save as Firestore Timestamp
       'lastAppointmentDate': lastAppointmentDate != null
           ? Timestamp.fromDate(lastAppointmentDate!)
           : null,
+
+      // ✅ New fields
+      'doctorId': doctorId,
+      'doctorName': doctorName,
+      'ashaId': ashaId,
     };
   }
 
+  /// 🔹 Convert Firestore Map to Patient object
   factory Patient.fromMap(Map<String, dynamic> data, String documentId) {
     return Patient(
       id: documentId,
@@ -49,12 +63,16 @@ class Patient {
       gender: data['gender'] ?? '',
       address: data['address'] ?? '',
       phone: data['phone'] ?? '',
-      // ✅ Handle both Timestamp and DateTime safely
       lastAppointmentDate: data['lastAppointmentDate'] != null
           ? (data['lastAppointmentDate'] is Timestamp
               ? (data['lastAppointmentDate'] as Timestamp).toDate()
               : (data['lastAppointmentDate'] as DateTime))
           : null,
+
+      // ✅ Read doctor + ASHA IDs safely
+      doctorId: data['doctorId'],
+      doctorName: data['doctorName'], // ✅ Added
+      ashaId: data['ashaId'],
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import 'package:arogyaconnect/models/patient.dart';
 import 'package:arogyaconnect/services/gemini_service.dart';
 import 'package:arogyaconnect/core/constants.dart';
@@ -14,16 +15,16 @@ class SymptomCheckerScreen extends StatefulWidget {
 
 class _SymptomCheckerScreenState extends State<SymptomCheckerScreen> {
   final List<Map<String, dynamic>> _symptoms = [
-    {"name": "Fever", "icon": Icons.thermostat, "emoji": "🔥"},
-    {"name": "Cough", "icon": Icons.sick, "emoji": "🤧"},
-    {"name": "Headache", "icon": Icons.psychology, "emoji": "🤕"},
-    {"name": "Fatigue", "icon": Icons.battery_alert, "emoji": "😴"},
-    {"name": "Chest Pain", "icon": Icons.favorite, "emoji": "❤️‍🔥"},
-    {"name": "Breathing Problem", "icon": Icons.air, "emoji": "😮‍💨"},
-    {"name": "Sore Throat", "icon": Icons.record_voice_over, "emoji": "😷"},
-    {"name": "Nausea", "icon": Icons.local_hospital, "emoji": "🤢"},
-    {"name": "Diarrhea", "icon": Icons.wc, "emoji": "🚽"},
-    {"name": "Back Pain", "icon": Icons.accessibility_new, "emoji": "🦴"},
+    {"name": "Fever", "emoji": "🔥", "name_pa": "ਬੁਖਾਰ"},
+    {"name": "Cough", "emoji": "🤧", "name_pa": "ਖੰਘ"},
+    {"name": "Headache", "emoji": "🤕", "name_pa": "ਸਿਰਦਰਦ"},
+    {"name": "Fatigue", "emoji": "😴", "name_pa": "ਥਕਾਵਟ"},
+    {"name": "Chest Pain", "emoji": "❤️‍🔥", "name_pa": "ਛਾਤੀ ਦਰਦ"},
+    {"name": "Breathing Problem", "emoji": "😮‍💨", "name_pa": "ਸਾਹ ਲੈਣ ਵਿੱਚ ਸਮੱਸਿਆ"},
+    {"name": "Sore Throat", "emoji": "😷", "name_pa": "ਗਲੇ ਵਿੱਚ ਦਰਦ"},
+    {"name": "Nausea", "emoji": "🤢", "name_pa": "ਮਤਲੀ"},
+    {"name": "Diarrhea", "emoji": "🚽", "name_pa": "ਦਸਤ"},
+    {"name": "Back Pain", "emoji": "🦴", "name_pa": "ਕਮਰ ਦਰਦ"},
   ];
 
   final Set<String> _selectedSymptoms = {};
@@ -31,18 +32,51 @@ class _SymptomCheckerScreenState extends State<SymptomCheckerScreen> {
   bool _loading = false;
 
   late final GeminiService _gemini;
+  final FlutterTts _tts = FlutterTts();
+  final ScrollController _scrollController = ScrollController();
+
+  bool _isPunjabi = false; // ✅ toggle state
+
+  // UI translations
+  final Map<String, Map<String, String>> _translations = {
+    "en": {
+      "title": "🩺 Symptom Checker",
+      "selectSymptoms": "👉 Select Your Problems",
+      "checkCondition": "Check Condition",
+      "hearResult": "Hear Result",
+      "clearSymptoms": "Clear Symptoms",
+    },
+    "pa": {
+      "title": "🩺 ਲੱਛਣ ਜਾਂਚਕਰਤਾ",
+      "selectSymptoms": "👉 ਆਪਣੀਆਂ ਸਮੱਸਿਆਵਾਂ ਚੁਣੋ",
+      "checkCondition": "ਬੀਮਾਰੀ ਜਾਂਚੋ",
+      "hearResult": "ਨਤੀਜਾ ਸੁਣੋ",
+      "clearSymptoms": "ਲੱਛਣ ਹਟਾਓ",
+    },
+  };
 
   @override
   void initState() {
     super.initState();
     _gemini = GeminiService(AppConstants.geminiApiKey);
+
+    _tts.setSpeechRate(0.5);
+    _tts.setPitch(1.0);
+    _tts.setLanguage("en-IN");
+  }
+
+  @override
+  void dispose() {
+    _tts.stop();
+    _scrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _checkSymptoms() async {
     if (_selectedSymptoms.isEmpty) {
-      setState(() {
-        _diagnosis = "⚠️ Please tap on the symptoms you feel.";
-      });
+      setState(() => _diagnosis = _isPunjabi
+          ? "⚠️ ਕਿਰਪਾ ਕਰਕੇ ਘੱਟੋ-ਘੱਟ ਇੱਕ ਲੱਛਣ ਚੁਣੋ।"
+          : "⚠️ Please tap on the symptoms you feel.");
       return;
     }
 
@@ -53,95 +87,122 @@ class _SymptomCheckerScreenState extends State<SymptomCheckerScreen> {
 
     final patientInfo = widget.patient == null
         ? "No extra patient info."
-        : "Name: ${widget.patient!.name}, Age: ${widget.patient!.age}, Gender: ${widget.patient!.gender}";
+        : "Age: ${widget.patient!.age}, Gender: ${widget.patient!.gender}";
 
     try {
-      final response =
-          await _gemini.getDiagnosis(patientInfo, _selectedSymptoms.toList());
+      final response = await _gemini.getDiagnosis(
+        patientInfo: patientInfo,
+        symptoms: _selectedSymptoms.toList(),
+      );
 
-      setState(() {
-        _diagnosis = response;
+      setState(() => _diagnosis = response);
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients) {
+          _scrollController.jumpTo(0);
+        }
       });
+
+      await _tts.speak(response);
     } catch (e) {
-      setState(() {
-        _diagnosis =
-            "⚠️ Error connecting to AI service. Please try again.\n${e.toString()}";
-      });
+      setState(() => _diagnosis = "⚠️ Error: $e");
     } finally {
-      setState(() {
-        _loading = false;
-      });
+      setState(() => _loading = false);
     }
+  }
+
+  void _resetSymptoms() {
+    setState(() {
+      _selectedSymptoms.clear();
+      _diagnosis = null; // ✅ clear diagnosis too
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    final lang = _isPunjabi ? "pa" : "en";
+
     return Scaffold(
+      backgroundColor: Colors.teal.shade50,
       appBar: AppBar(
-        title: const Text("Symptom Checker"),
+        title: Text(_translations[lang]!["title"]!),
         centerTitle: true,
+        actions: [
+          // ✅ Language toggle
+          IconButton(
+            icon: Icon(_isPunjabi ? Icons.language : Icons.translate),
+            tooltip: "Switch Language",
+            onPressed: () {
+              setState(() {
+                _isPunjabi = !_isPunjabi;
+              });
+            },
+          ),
+          if (_selectedSymptoms.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              tooltip: "Reset",
+              onPressed: _resetSymptoms,
+            ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            if (widget.patient != null) ...[
-              Text(
-                "👤 Patient: ${widget.patient!.name} (Age: ${widget.patient!.age}, Gender: ${widget.patient!.gender})",
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+            if (widget.patient != null)
+              Card(
+                color: Colors.white,
+                child: ListTile(
+                  leading: const Icon(Icons.person, color: Colors.teal),
+                  title: Text(
+                      "👤 Age: ${widget.patient!.age}, Gender: ${widget.patient!.gender}"),
                 ),
-                textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 12),
-            ],
+            const SizedBox(height: 12),
 
-            const Text(
-              "👉 Tap the symptoms you feel",
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            Text(
+              _translations[lang]!["selectSymptoms"]!,
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
 
-            // Symptoms Grid
             Expanded(
               child: GridView.builder(
-                gridDelegate:
-                    const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
                   mainAxisSpacing: 12,
                   crossAxisSpacing: 12,
                 ),
                 itemCount: _symptoms.length,
                 itemBuilder: (context, index) {
                   final symptom = _symptoms[index];
-                  final selected =
-                      _selectedSymptoms.contains(symptom["name"]);
+                  final selected = _selectedSymptoms.contains(symptom["name"]);
 
                   return GestureDetector(
                     onTap: () {
                       setState(() {
-                        if (selected) {
-                          _selectedSymptoms.remove(symptom["name"]);
-                        } else {
-                          _selectedSymptoms.add(symptom["name"]);
-                        }
+                        selected
+                            ? _selectedSymptoms.remove(symptom["name"])
+                            : _selectedSymptoms.add(symptom["name"]);
                       });
                     },
-                    child: Container(
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: selected ? Colors.blue.shade100 : Colors.white,
+                        color: selected ? Colors.teal.shade200 : Colors.white,
+                        borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: selected ? Colors.blue : Colors.grey,
+                          color: selected ? Colors.teal : Colors.grey,
                           width: 2,
                         ),
-                        borderRadius: BorderRadius.circular(16),
                         boxShadow: const [
                           BoxShadow(
-                            color: Colors.black12,
-                            blurRadius: 5,
-                            offset: Offset(2, 2),
-                          )
+                              color: Colors.black12,
+                              blurRadius: 5,
+                              offset: Offset(2, 2))
                         ],
                       ),
                       child: Column(
@@ -149,17 +210,18 @@ class _SymptomCheckerScreenState extends State<SymptomCheckerScreen> {
                         children: [
                           Text(symptom["emoji"],
                               style: const TextStyle(fontSize: 40)),
-                          const SizedBox(height: 8),
-                          Icon(symptom["icon"],
-                              size: 30, color: Colors.black87),
                           const SizedBox(height: 6),
                           Text(
-                            symptom["name"],
+                            _isPunjabi
+                                ? symptom["name_pa"]
+                                : symptom["name"],
                             style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                            ),
+                                fontSize: 14, // ✅ smaller font
+                                fontWeight: FontWeight.w600),
+                            maxLines: 2, // ✅ prevent overflow
+                            overflow: TextOverflow.ellipsis,
                             textAlign: TextAlign.center,
+                            softWrap: true,
                           ),
                         ],
                       ),
@@ -169,37 +231,78 @@ class _SymptomCheckerScreenState extends State<SymptomCheckerScreen> {
               ),
             ),
 
-            ElevatedButton(
-              onPressed: _checkSymptoms,
-              style: ElevatedButton.styleFrom(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 40, vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+            if (_selectedSymptoms.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8.0),
+                child: ElevatedButton.icon(
+                  onPressed: _resetSymptoms,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.redAccent,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 12),
+                  ),
+                  icon: const Icon(Icons.delete),
+                  label: Text(_translations[lang]!["clearSymptoms"]!),
                 ),
               ),
-              child: const Text(
-                "Check Condition",
-                style: TextStyle(fontSize: 18),
+
+            ElevatedButton.icon(
+              onPressed: _checkSymptoms,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.teal,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
               ),
+              icon: const Icon(Icons.health_and_safety, size: 24),
+              label: Text(_translations[lang]!["checkCondition"]!,
+                  style: const TextStyle(
+                      fontSize: 20, fontWeight: FontWeight.bold)),
             ),
             const SizedBox(height: 16),
 
             if (_loading) const CircularProgressIndicator(),
 
             if (_diagnosis != null && !_loading)
-              Card(
-                color: Colors.yellow.shade100,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                elevation: 4,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text(
-                    _diagnosis!,
-                    style: const TextStyle(fontSize: 18),
-                    textAlign: TextAlign.center,
+              Expanded(
+                child: Card(
+                  color: Colors.yellow.shade100,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        Expanded(
+                          child: SingleChildScrollView(
+                            controller: _scrollController,
+                            child: SelectableText(
+                              _diagnosis!,
+                              style: const TextStyle(
+                                  fontSize: 20, fontWeight: FontWeight.w500),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        ElevatedButton.icon(
+                          onPressed: () async {
+                            if (_diagnosis != null) {
+                              await _tts.speak(_diagnosis!);
+                            }
+                          },
+                          icon: const Icon(Icons.volume_up),
+                          label:
+                              Text(_translations[lang]!["hearResult"]!),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.orange,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 20, vertical: 12),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),

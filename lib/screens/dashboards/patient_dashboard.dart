@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
+
 import '../../services/database_service.dart';
+import '../../providers/session_provider.dart';
 import '../symptom_checker_screen.dart';
+import 'package:arogyaconnect/screens/calls/video_call_screen.dart';
 
 class PatientDashboard extends StatefulWidget {
   final String userId;
@@ -19,16 +23,16 @@ class _PatientDashboardState extends State<PatientDashboard> {
   Map<String, dynamic>? _asha;
   bool _loading = true;
 
-  int _availableDoctorsCount = 0; // ✅ count variable
+  int _availableDoctorsCount = 0;
 
   @override
   void initState() {
     super.initState();
     _loadPatient();
-    _loadAvailableDoctors(); // ✅ also fetch availability
+    _loadAvailableDoctors();
   }
 
-  /// 🔹 Load patient + assigned doctor + ASHA
+  /// 🔹 Load patient + doctor + ASHA worker
   Future<void> _loadPatient() async {
     try {
       final data = await _dbService.getPatientById(widget.userId);
@@ -57,12 +61,12 @@ class _PatientDashboardState extends State<PatientDashboard> {
         _loading = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error loading patient: $e")),
+        SnackBar(content: Text("❌ Error loading patient: $e")),
       );
     }
   }
 
-  /// 🔹 Load available doctor count from Firestore
+  /// 🔹 Load available doctors count
   Future<void> _loadAvailableDoctors() async {
     try {
       final snapshot = await FirebaseFirestore.instance
@@ -79,7 +83,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
     }
   }
 
-  /// 🔹 Helper widget for details
+  /// 🔹 Helper for showing patient details
   Widget _buildDetail(String label, dynamic value, {IconData? icon}) {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 6),
@@ -93,6 +97,50 @@ class _PatientDashboardState extends State<PatientDashboard> {
     );
   }
 
+  /// 🔹 Request Teleconsultation
+  Future<void> _requestTeleconsultation() async {
+    try {
+      if (_patient == null || _doctor == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Doctor or patient info missing")),
+        );
+        return;
+      }
+
+      final sessionProvider =
+          Provider.of<SessionProvider>(context, listen: false);
+
+      // ✅ Generate unique channel
+      String channelName = "session_${DateTime.now().millisecondsSinceEpoch}";
+
+      // ✅ Create session in Firestore
+      String sessionId = await sessionProvider.createSession(
+        _patient!['id'] ?? widget.userId, // patientId
+        _doctor!['id'] ?? "doctor001",    // doctorId fallback
+        channelName: channelName,
+      );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("✅ Teleconsultation requested (ID: $sessionId)")),
+      );
+
+      // ✅ Navigate patient to Video Call
+      if (mounted) {
+        Navigator.push(
+  context,
+  MaterialPageRoute(
+    builder: (_) => const VideoCallScreen(channelName: "arogya_demo"),
+  ),
+);
+
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("❌ Error requesting teleconsultation: $e")),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -104,7 +152,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
             icon: const Icon(Icons.refresh),
             onPressed: () {
               _loadPatient();
-              _loadAvailableDoctors(); // ✅ refresh availability
+              _loadAvailableDoctors();
             },
           ),
         ],
@@ -184,6 +232,20 @@ class _PatientDashboardState extends State<PatientDashboard> {
                         label: const Text("AI Symptom Checker"),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.teal,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 14),
+                        ),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      /// ✅ Teleconsultation button
+                      ElevatedButton.icon(
+                        onPressed: _requestTeleconsultation,
+                        icon: const Icon(Icons.video_call),
+                        label: const Text("Request Teleconsultation"),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange,
                           padding: const EdgeInsets.symmetric(
                               horizontal: 20, vertical: 14),
                         ),

@@ -1,49 +1,59 @@
 name: arogyaconnect
-description: "A new Flutter project."
+description: "ArogyaConnect App"
 publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: '^3.9.0'   # Adjust to your installed SDK version
+  sdk: ">=3.0.0 <4.0.0"
 
 dependencies:
   flutter:
     sdk: flutter
 
-  # Local database
-  sqflite: ^2.3.0
-  path: ^1.8.3
-  http: ^1.2.0
+  # --- Local Database & HTTP ---
+  sqflite: ^2.3.3
+  path: ^1.9.0
+  http: ^1.2.2
+
+  # --- Google Gemini AI ---
   google_generative_ai: ^0.4.3
-  
 
-  # Firebase Core (required for all Firebase services)
-  firebase_core: ^2.15.0
+  # --- Firebase (Core + Services) ---
+  firebase_core: ^2.30.1
+  firebase_auth: ^4.19.6
+  cloud_firestore: ^4.17.5
+  firebase_storage: ^11.7.7
 
-  # Firebase Authentication (for Admin/Doctor/ASHA login)
-  firebase_auth: ^4.7.0
+  # --- State Management ---
+  provider: ^6.1.2
 
-  # Cloud Firestore (for storing users, patients, doctors, etc.)
-  cloud_firestore: ^4.10.0
+  # --- UI & Icons ---
+  google_fonts: ^6.2.1
+  font_awesome_flutter: ^10.7.0
+  cupertino_icons: ^1.0.8
 
-  # Firebase Storage (if you want to upload files like reports, images)
-  firebase_storage: ^11.2.0
+  # --- Forms & Validation ---
+  flutter_form_builder: ^9.2.1
 
-  # State management
-  provider: ^6.0.5
+  # --- Date Formatting ---
+  intl: ^0.19.0
 
-  # UI / Icons
-  google_fonts: ^5.1.0
-  font_awesome_flutter: ^10.5.0
-
-  # Forms & validation
-  flutter_form_builder: ^9.1.0
-
-  # Date formatting
-  intl: ^0.18.1
+  # --- Env Variables ---
   flutter_dotenv: ^6.0.0
 
+  # --- Text to Speech ---
+  flutter_tts: ^4.0.2
+
+  # --- Permissions (Camera, Mic, Storage) ---
+  permission_handler: ^11.3.1
+
+  # --- Agora Video Call ---
+  agora_rtc_engine: ^6.3.2
+
 dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
   flutter_launcher_icons: ^0.13.1
 
 flutter:

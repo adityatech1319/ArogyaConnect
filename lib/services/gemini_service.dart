@@ -6,37 +6,52 @@ class GeminiService {
   final String apiKey;
   GeminiService(this.apiKey);
 
-  /// Ask Gemini for diagnosis based on symptoms + patient info
-  Future<String> getDiagnosis(String patientInfo, List<String> symptoms) async {
-    final url = Uri.parse(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=$apiKey");
+  /// 🔹 Get AI-based diagnosis for a patient
+  Future<String> getDiagnosis({
+    required String patientInfo,
+    required List<String> symptoms,
+  }) async {
+   final url = Uri.parse(
+  "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=$apiKey",
+);
 
-    final body = {
+
+    final requestBody = {
       "contents": [
         {
           "parts": [
             {
-              "text":
-                  "The patient details are: $patientInfo. The patient reports the following symptoms: ${symptoms.join(", ")}. "
-                      "Please explain possible conditions in very simple language for non-medical people."
+              "text": 
+                  "Patient details: $patientInfo\n"
+                  "Reported symptoms: ${symptoms.join(", ")}\n\n"
+                  "👉 Give possible health conditions in very simple, everyday language "
+                  "(avoid medical jargon).\n"
+                  "👉 Clearly mention: When should the patient see a doctor immediately?"
             }
           ]
         }
       ]
     };
 
-    final response = await http.post(
-      url,
-      headers: {"Content-Type": "application/json"},
-      body: jsonEncode(body),
-    );
+    try {
+      final response = await http.post(
+        url,
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode(requestBody),
+      );
 
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return data["candidates"]?[0]?["content"]?["parts"]?[0]?["text"] ??
-          "⚠️ No diagnosis received.";
-    } else {
-      throw Exception("Gemini API error: ${response.body}");
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        // ✅ Safe parsing with null checks
+        final text = data["candidates"]?[0]?["content"]?["parts"]?[0]?["text"];
+
+        return text?.trim() ?? "⚠️ No diagnosis received. Try again.";
+      } else {
+        return "❌ Gemini API error (${response.statusCode}):\n${response.body}";
+      }
+    } catch (e) {
+      return "⚠️ Error connecting to Gemini API: $e";
     }
   }
 }

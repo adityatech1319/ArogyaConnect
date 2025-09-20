@@ -17,9 +17,15 @@ String _formatDate(dynamic timestamp) {
 
 class PatientCard extends StatelessWidget {
   final Patient patient;
-  final VoidCallback? onEdit; // optional edit
+  final VoidCallback? onEdit;          // optional edit
+  final VoidCallback? onAssignDoctor;  // ✅ new callback
 
-  const PatientCard({super.key, required this.patient, this.onEdit});
+  const PatientCard({
+    super.key,
+    required this.patient,
+    this.onEdit,
+    this.onAssignDoctor,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -27,28 +33,72 @@ class PatientCard extends StatelessWidget {
       elevation: 3,
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(12),
-        title: Text(
-          patient.name,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-        ),
-        subtitle: Column(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Patient basic info
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  patient.name,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 18),
+                ),
+                if (onEdit != null)
+                  IconButton(
+                    icon: const Icon(Icons.edit, color: Colors.blue),
+                    onPressed: onEdit,
+                  ),
+              ],
+            ),
             Text("Age: ${patient.age}, Gender: ${patient.gender}"),
             Text("Phone: ${patient.phone}"),
             Text("Address: ${patient.address}"),
             Text("Weight: ${patient.weight} kg, Height: ${patient.height} cm"),
-            Text("Last Appointment: ${_formatDate(patient.lastAppointmentDate)}"), // ✅ fixed
+            Text(
+                "Last Appointment: ${_formatDate(patient.lastAppointmentDate)}"),
+
+            // ✅ Show doctor info if assigned
+            const SizedBox(height: 6),
+            Text(
+              patient.doctorName != null && patient.doctorName!.isNotEmpty
+                  ? "Assigned Doctor: ${patient.doctorName}"
+                  : "Assigned Doctor: Not assigned",
+              style: TextStyle(
+                fontWeight: FontWeight.w500,
+                color: patient.doctorName != null &&
+                        patient.doctorName!.isNotEmpty
+                    ? Colors.green[700]
+                    : Colors.red[700],
+              ),
+            ),
+
+            const SizedBox(height: 8),
+
+            // ✅ Doctor assign button
+            if (onAssignDoctor != null)
+              Align(
+                alignment: Alignment.centerRight,
+                child: ElevatedButton.icon(
+                  onPressed: onAssignDoctor,
+                  icon: const Icon(Icons.person_add_alt_1),
+                  label: Text(
+                    patient.doctorName != null &&
+                            patient.doctorName!.isNotEmpty
+                        ? "Reassign Doctor"
+                        : "Assign Doctor",
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ),
           ],
         ),
-        trailing: onEdit != null
-            ? IconButton(
-                icon: const Icon(Icons.edit, color: Colors.blue),
-                onPressed: onEdit,
-              )
-            : null,
       ),
     );
   }

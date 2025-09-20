@@ -2,13 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:provider/provider.dart';
 
 import 'screens/login_screen.dart';
 import 'firebase_options.dart';
+import 'providers/session_provider.dart';
+import 'services/gemini_service.dart';   // ✅ Gemini Service
+import 'core/constants.dart';           // ✅ For API key
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
@@ -21,11 +25,22 @@ Future<void> main() async {
       );
     }
   } catch (e) {
-    print("Firebase initialization error: $e");
-    // Handle error appropriately (e.g., show error UI)
+    debugPrint("❌ Firebase initialization error: $e");
   }
 
-  runApp(const ArogyaConnectApp());
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => SessionProvider()),
+
+        // ✅ GeminiService available globally
+        Provider<GeminiService>(
+          create: (_) => GeminiService(AppConstants.geminiApiKey),
+        ),
+      ],
+      child: const ArogyaConnectApp(),
+    ),
+  );
 }
 
 class ArogyaConnectApp extends StatelessWidget {
@@ -37,7 +52,7 @@ class ArogyaConnectApp extends StatelessWidget {
       title: "Arogya Connect",
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        primarySwatch: Colors.teal,
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
         useMaterial3: true,
       ),
       home: const LoginScreen(),

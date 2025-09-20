@@ -1,11 +1,10 @@
-// lib/screens/dashboards/doctor_dashboard.dart
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // ✅ Add FirebaseAuth for sign out
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 import 'package:arogyaconnect/services/database_service.dart';
-import 'package:arogyaconnect/models/patient.dart';
-import 'package:arogyaconnect/widgets/patient_card.dart';
-import 'package:arogyaconnect/main.dart'; // ✅ For LoginScreen
-import 'package:arogyaconnect/screens/login_screen.dart'; // ✅ For LoginScreen
+import 'package:arogyaconnect/screens/login_screen.dart';
+import 'package:arogyaconnect/screens/calls/video_call_screen.dart';
 
 class DoctorDashboard extends StatefulWidget {
   final String userId;
@@ -84,6 +83,46 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
     }
   }
 
+  /// 🔹 Accept Teleconsultation → update Firestore + open video call
+Future<void> _acceptSession(String sessionId, String channelName) async {
+  // For now, token is empty (replace later with generated one)
+  const String token = "";
+
+  await FirebaseFirestore.instance
+      .collection('sessions')
+      .doc(sessionId)
+      .update({
+        "status": "accepted",
+        "token": token,
+      });
+
+  if (mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("✅ Session accepted")),
+    );
+
+    Navigator.push(
+  context,
+  MaterialPageRoute(
+    builder: (_) => const VideoCallScreen(channelName: "arogya_demo"),
+  ),
+);
+
+  }
+}
+
+  /// 🔹 Reject Teleconsultation
+  Future<void> _rejectSession(String sessionId) async {
+    await FirebaseFirestore.instance
+        .collection('sessions')
+        .doc(sessionId)
+        .update({"status": "rejected"});
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("❌ Session rejected")),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -147,32 +186,68 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
                   ),
                 ),
 
-                /// 🔹 Patients assigned to doctor
+                const SizedBox(height: 10),
+
+                /// 🔹 Pending teleconsultations
                 Expanded(
-                  child: StreamBuilder<List<Patient>>(
-                    stream: _dbService.getPatients(), // 🔥 live updates
+                  child: StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection("sessions")
+                        .where("doctorId", isEqualTo: widget.userId)
+                        .where("status", isEqualTo: "pending")
+                        .snapshots(),
                     builder: (context, snapshot) {
                       if (snapshot.connectionState ==
                           ConnectionState.waiting) {
                         return const Center(
                             child: CircularProgressIndicator());
                       }
-                      if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                         return const Center(
-                          child: Text("No patients assigned yet."),
+                          child: Text("No teleconsultation requests yet."),
                         );
                       }
 
-                      final patients = snapshot.data!;
-                      return RefreshIndicator(
-                        onRefresh: _loadUserData,
-                        child: ListView.builder(
-                          padding: const EdgeInsets.all(12),
-                          itemCount: patients.length,
-                          itemBuilder: (context, index) {
-                            return PatientCard(patient: patients[index]);
-                          },
-                        ),
+                      final sessions = snapshot.data!.docs;
+
+                      return ListView.builder(
+                        padding: const EdgeInsets.all(12),
+                        itemCount: sessions.length,
+                        itemBuilder: (context, index) {
+                          final session = sessions[index];
+                          final data =
+                              session.data() as Map<String, dynamic>;
+
+                          return Card(
+                            child: ListTile(
+                              leading: const Icon(Icons.video_call,
+                                  color: Colors.blue),
+                              title: Text("Patient: ${data['patientId']}"),
+                              subtitle: Text(
+                                "Channel: ${data['channelName'] ?? 'N/A'}",
+                              ),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.check,
+                                        color: Colors.green),
+                                    onPressed: () => _acceptSession(
+                                      session.id,
+                                      data['channelName'] ?? "defaultChannel",
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.close,
+                                        color: Colors.red),
+                                    onPressed: () =>
+                                        _rejectSession(session.id),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
                       );
                     },
                   ),

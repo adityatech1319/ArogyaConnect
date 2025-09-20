@@ -11,6 +11,8 @@ class DatabaseService {
     await _db.collection('patients').add({
       ...patient.toMap(),
       'ashaId': ashaId, // ✅ Link patient to ASHA
+      'doctorId': null, // ✅ Initialize doctorId
+      'doctorName': null, // ✅ Initialize doctorName
       'createdBy': ashaId,
       'createdAt': FieldValue.serverTimestamp(),
     });
@@ -223,6 +225,36 @@ class DatabaseService {
     }
     final snapshot = await query.get();
     return snapshot.size;
+  }
+
+  /// ✅ Assign doctor (saves both doctorId + doctorName)
+ Future<void> assignDoctorToPatient(
+    String patientId, String doctorId, String doctorName) async {
+  await FirebaseFirestore.instance
+      .collection("patients")
+      .doc(patientId)
+      .update({
+    "doctorId": doctorId,
+    "doctorName": doctorName,
+  });
+}
+
+
+  /// Assign ASHA worker to patient
+  Future<void> assignAshaToPatient(String patientId, String ashaId) async {
+    await _db.collection('patients').doc(patientId).update({
+      'ashaId': ashaId,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// Get username by userId
+  Future<String?> getUserNameById(String userId) async {
+    final doc = await _db.collection('users').doc(userId).get();
+    if (doc.exists) {
+      return doc['username'];
+    }
+    return null;
   }
 
   // ---------------- Symptom Checks ----------------

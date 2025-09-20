@@ -22,5 +22,8 @@ class AppConstants {
   static const String statusUnavailable = "unavailable";
 
   // 🔹 Gemini API Key (from .env)
-  static String get geminiApiKey => dotenv.env['GEMINI_API_KEY'] ?? "";
+  
+  static const String agoraAppId = "bc1efcc9656b48bea1674c9afddf5f9a";
+  static const String geminiApiKey = "AIzaSyA_0h7Xe1BCRdPRhiEsRCO2-on0KfTcHAw";
+   static const String agoraToken = ""; // Use "" if no token
 }
